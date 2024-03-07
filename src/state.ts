@@ -8,6 +8,10 @@ export const gameMachine = setup({
       start: string;
       end: string;
       curLinks: Record<string, string>;
+      error: {
+        message: string;
+        error: "VERIFY_FAIL" | "FETCH_FAIL";
+      } | null;
     },
     events: {} as
       | { type: "start"; params: { start: string; end: string } }
@@ -17,7 +21,16 @@ export const gameMachine = setup({
       | { type: "setLinks"; links: string[] },
   },
   actors: {
-    VerifyTerm: fromPromise(({ input }) => api.post("/verify/", input)),
+    VerifyTerm: fromPromise(async ({ input }) => {
+      const { data } = await api.post<Record<string, boolean>>(
+        "/verify/",
+        input,
+      );
+
+      if (Object.values(data).every((val) => val)) return true;
+
+      return Promise.reject(data);
+    }),
     GrabLinks: fromPromise(async ({ input }) => {
       if (!input || !("term" in input)) return false;
       return api
@@ -26,8 +39,10 @@ export const gameMachine = setup({
     }),
   },
   guards: {
-    gameNotOver: ({ context }) =>
-      context.moves[context.moves.length - 1] !== context.end,
+    gameNotOver: ({ context }) => {
+      console.log("happening?", context);
+      return context.moves[context.moves.length - 1] !== context.end;
+    },
   },
   schemas: {
     events: {
@@ -65,6 +80,7 @@ export const gameMachine = setup({
     start: "",
     end: "",
     curLinks: {},
+    error: null,
   },
   id: "Game",
   initial: "InitialState",
@@ -88,21 +104,34 @@ export const gameMachine = setup({
         },
         onError: {
           target: "GameCantStart",
+          actions: ({ context }) => {
+            context.error = {
+              message: "Failed to verify terms woops",
+              error: "VERIFY_FAIL",
+            };
+          },
         },
         src: "VerifyTerm",
       },
+    },
+    PreGameBullShitState: {
+      always: [
+        {
+          target: "GameStarted",
+          guard: {
+            type: "gameNotOver",
+          },
+        },
+        {
+          target: "GameFinished",
+        },
+      ],
     },
     GameStarted: {
       on: {
         playMove: [
           {
             target: "Fetching",
-            guard: {
-              type: "gameNotOver",
-            },
-          },
-          {
-            target: "GameFinished",
           },
         ],
       },
@@ -126,18 +155,28 @@ export const gameMachine = setup({
           term: context.moves[context.moves.length - 1] ?? context.start,
         }),
         onDone: {
-          target: "GameStarted",
+          target: "PreGameBullShitState",
           actions: ({ context, event }) => {
             context.curLinks = event.output as Record<string, string>;
           },
         },
         onError: {
           target: "GameCantStart",
+          actions: ({ context }) => {
+            context.error = {
+              message: "Failed to fetch term links woops",
+              error: "FETCH_FAIL",
+            };
+          },
         },
         src: "GrabLinks",
       },
     },
     GameFinished: {
+      entry: assign(({ context }) => {
+        context.curLinks = {};
+        return context;
+      }),
       on: {
         reset: {
           target: "InitialState",

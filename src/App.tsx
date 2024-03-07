@@ -15,13 +15,11 @@ const Terms = ({
 }) => {
   return (
     <div>
-      {Object.entries(links)
-        .slice(0, 10)
-        .map(([name]) => (
-          <span>
-            <button onClick={() => playMove(name)}>{name}</button>
-          </span>
-        ))}
+      {Object.entries(links).map(([name]) => (
+        <span key={name}>
+          <button onClick={() => playMove(name)}>{name}</button>
+        </span>
+      ))}
     </div>
   );
 };
