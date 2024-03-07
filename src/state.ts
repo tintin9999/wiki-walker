@@ -1,4 +1,5 @@
-import { fromPromise, setup } from "xstate";
+import { assign, fromPromise, setup } from "xstate";
+import { api } from "./api";
 
 export const gameMachine = setup({
   types: {
@@ -6,38 +7,27 @@ export const gameMachine = setup({
       moves: string[];
       start: string;
       end: string;
-      curLinks: string[];
+      curLinks: Record<string, string>;
     },
     events: {} as
       | { type: "start"; params: { start: string; end: string } }
-      | { type: "playMove" }
+      | { type: "playMove"; params: { move: string } }
       | { type: "reset" }
-      | { type: "restart" },
+      | { type: "restart" }
+      | { type: "setLinks"; links: string[] },
   },
   actors: {
-    VerifyTerm: fromPromise(async ({ input }) => {
-      console.log("getting here", input);
-      const response = await fetch(`http://localhost:8080/verify/`, {
-        method: "POST",
-        body: JSON.stringify(input),
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-      const resp = await response.json();
-      console.log(resp);
-      return resp;
-    }),
+    VerifyTerm: fromPromise(({ input }) => api.post("/verify/", input)),
     GrabLinks: fromPromise(async ({ input }) => {
-      const response = await fetch(`http://localhost:8080/link/${input.term}`);
-      const resp = await response.json();
-      console.log(resp);
+      if (!input || !("term" in input)) return false;
+      return api
+        .get<Record<string, string>>(`/link/${input.term}`)
+        .then((res) => res.data);
     }),
   },
   guards: {
-    gameNotOver: function ({}) {
-      return false;
-    },
+    gameNotOver: ({ context }) =>
+      context.moves[context.moves.length - 1] !== context.end,
   },
   schemas: {
     events: {
@@ -74,7 +64,7 @@ export const gameMachine = setup({
     moves: [],
     start: "",
     end: "",
-    curLinks: [],
+    curLinks: {},
   },
   id: "Game",
   initial: "InitialState",
@@ -94,7 +84,7 @@ export const gameMachine = setup({
       invoke: {
         input: ({ context }) => ({ terms: [context.start, context.end] }),
         onDone: {
-          target: "GameStarted",
+          target: "Fetching",
         },
         onError: {
           target: "GameCantStart",
@@ -125,17 +115,26 @@ export const gameMachine = setup({
       },
     },
     Fetching: {
+      entry: assign(({ context, event }) => {
+        context.moves.push(
+          event.type === "playMove" ? event.params.move : context.start,
+        );
+        return context;
+      }),
       invoke: {
-        input: {
-          term: "string",
-        },
+        input: ({ context }) => ({
+          term: context.moves[context.moves.length - 1] ?? context.start,
+        }),
         onDone: {
           target: "GameStarted",
+          actions: ({ context, event }) => {
+            context.curLinks = event.output as Record<string, string>;
+          },
         },
         onError: {
           target: "GameCantStart",
         },
-        src: "VerifyTerm",
+        src: "GrabLinks",
       },
     },
     GameFinished: {
