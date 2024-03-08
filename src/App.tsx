@@ -24,24 +24,35 @@ const Terms = ({
   );
 };
 
+const StartContainer = ({ children }: { children: React.ReactNode }) => {
+  return <div>{children}</div>;
+};
+
 function App() {
   const [state, send] = useMachine(gameMachine);
 
   return (
-    <div>
-      <StartEndInput
-        startGame={(start, end) => {
-          send({ type: "start", params: { start, end } });
-        }}
-      />
-      <Terms
-        links={state.context.curLinks}
-        playMove={(move: string) => {
-          send({ type: "playMove", params: { move: move } });
-        }}
-      />
-      <Debugger state={state} />
-    </div>
+    <main className="flex h-screen flex-col items-center justify-center">
+      <StartContainer>
+        <StartEndInput
+          classNames={{
+            inputContainers: "flex space-x-4",
+          }}
+          startGame={(start, end) => {
+            send({ type: "start", params: { start, end } });
+          }}
+        />
+      </StartContainer>
+      <div>
+        <Terms
+          links={state.context.curLinks}
+          playMove={(move: string) => {
+            send({ type: "playMove", params: { move: move } });
+          }}
+        />
+        <Debugger state={state} />
+      </div>
+    </main>
   );
 }
 

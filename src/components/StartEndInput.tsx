@@ -1,10 +1,20 @@
 import { useState } from "react";
 import { RenderIf } from "./utils";
+import { TextInput } from "./ControlledInput";
+import { Button } from "./ui/button";
 
 export const StartEndInput = ({
   startGame,
+  classNames,
 }: {
   startGame: (start: string, end: string) => void;
+  classNames?: {
+    container?: string;
+    inputContainers?: string;
+    startContainer?: string;
+    endContainer?: string;
+    btnContainer?: string;
+  };
 }) => {
   const [state, setState] = useState({
     start: {
@@ -17,16 +27,6 @@ export const StartEndInput = ({
     },
   });
 
-  const updateState = (key: "start" | "end", value: string) => {
-    setState((state) => ({
-      ...state,
-      [key]: {
-        value,
-        error: "",
-      },
-    }));
-  };
-
   const setError = (key: "start" | "end", error: string) => {
     setState((state) => ({
       ...state,
@@ -38,33 +38,33 @@ export const StartEndInput = ({
   };
 
   return (
-    <div>
-      <div>
-        <div>
-          <label>Start Term</label>
-          <input
-            type="text"
-            value={state.start.value}
-            onChange={(e) => updateState("start", e.target.value)}
+    <div className={classNames?.container}>
+      <div className={classNames?.inputContainers}>
+        <div className={classNames?.startContainer}>
+          <TextInput
+            name="start"
+            state={state}
+            label="Start Term"
+            setState={setState as any}
           />
           <RenderIf isTrue={state.start.error}>
             <div>{state.start.error}</div>
           </RenderIf>
         </div>
-        <div>
-          <label>End Term</label>
-          <input
-            type="text"
-            value={state.end.value}
-            onChange={(e) => updateState("end", e.target.value)}
+        <div className={classNames?.endContainer}>
+          <TextInput
+            name="end"
+            state={state}
+            label="End Term"
+            setState={setState as any}
           />
           <RenderIf isTrue={state.end.error}>
             <div>{state.end.error}</div>
           </RenderIf>
         </div>
       </div>
-      <div>
-        <button
+      <div className={classNames?.btnContainer}>
+        <Button
           onClick={() => {
             let hasError = false;
             if (!state.start.value) {
@@ -83,7 +83,7 @@ export const StartEndInput = ({
           }}
         >
           Start Game
-        </button>
+        </Button>
       </div>
     </div>
   );
